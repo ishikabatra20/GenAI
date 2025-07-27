@@ -1,8 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
+import { API_Key } from "./constants";
 import readlineSync from "readline-sync";
-const ai = new GoogleGenAI({
-  apiKey: "AIzaSyCoYvMrqt7A9O78Wvhbo1qaRhAJP0SIGhg",
-});
+const ai = new GoogleGenAI({apiKey: API_Key});
 
 const History = [];
 async function Chatting(userProblems) {

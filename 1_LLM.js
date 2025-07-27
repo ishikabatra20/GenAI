@@ -1,6 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import readlineSync from "readline-sync";
-const ai = new GoogleGenAI({apiKey: "AIzaSyCoYvMrqt7A9O78Wvhbo1qaRhAJP0SIGhg"});
+import { API_Key } from "./constants";
+const ai = new GoogleGenAI({apiKey: API_Key});
 
 async function main() {
   const response = await ai.models.generateContent({
