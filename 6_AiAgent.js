@@ -1,9 +1,11 @@
 import { GoogleGenAI } from "@google/genai";
-import readline from "readline-sync";
+import readlineSync from "readline-sync";
 import { API_Key } from "./constants.js";
 
 const ai = new GoogleGenAI({ apiKey: API_Key });
+
 const History = [];
+
 function sum({ num1, num2 }) {
   return num1 + num2;
 }
@@ -25,90 +27,137 @@ async function getCryptoPrice({ coin }) {
   return data;
 }
 
-
-const sumDeclaration={
-    name: 'sum',
-    description: "Get the sum of two numbers.",
-    parameter:{
-        type: 'OBJECT',
-        properties:{
-            num1:{
-                type: "NUMBER",
-                description: "It will be first number for addition. example- 10"
-            },
-            num2:{
-                type: "NUMBER",
-                description:"It will be second number for addition. example- 13"
-            }
-        },
-        required : ["num1", "num2"]
+const sumDeclaration = {
+  name: "sum",
+  description: "Get the sum of 2 number",
+  parameters: {
+    type: "OBJECT",
+    properties: {
+      num1: {
+        type: "NUMBER",
+        description: "It will be first number for addition ex: 10",
+      },
+      num2: {
+        type: "NUMBER",
+        description: "It will be Second number for addition ex: 10",
+      },
     },
+    required: ["num1", "num2"],
+  },
+};
 
-}
-
-
-const primeDeclaration={
-    name : 'prime',
-    description:"Get if number is prime or not.",
-    parameter:{
-        type: "OBJECT",
-        properties:{
-            num:{
-                type:"NUMBER",
-                description:"It will be number to find whether it's prime or not. ex-13",
-            }
-        },
-        required: ['num']
-    }
-}
+const primeDeclaration = {
+  name: "prime",
+  description: "Get if number if prime or not",
+  parameters: {
+    type: "OBJECT",
+    properties: {
+      num: {
+        type: "NUMBER",
+        description: "It will be the number to find it is prime or not ex: 13",
+      },
+    },
+    required: ["num"],
+  },
+};
 
 const cryptoDeclaration = {
-    name:'getCryptoPrice',
-    description:"Get the current price of any crypto Currency like bitcoin",
-    parameters:{
-        type:'OBJECT',
-        properties:{
-            coin:{
-                type:'STRING',
-                description: 'It will be the crypto currency name, like bitcoin'
-            },
-        },
-        required: ['coin']   
-    }
-}
+  name: "getCryptoPrice",
+  description: "Get the current price of any crypto Currency like bitcoin",
+  parameters: {
+    type: "OBJECT",
+    properties: {
+      coin: {
+        type: "STRING",
+        description: "It will be the crypto currency name, like bitcoin",
+      },
+    },
+    required: ["coin"],
+  },
+};
 
-async function runAgent(userProblems) {
+const availableTools = {
+  sum: sum,
+  prime: prime,
+  getCryptoPrice: getCryptoPrice,
+};
+
+async function runAgent(userProblem) {
   History.push({
     role: "user",
-    parts: { text: userProblems },
+    parts: [{ text: userProblem }],
   });
-  const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash",
-    contents: History,
-    config:{
-      tools:[{
-        functionDeclarations: [sumDeclaration,cryptoDeclaration,primeDeclaration]
-      }]
+
+  while (true) {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: History,
+      config: {
+        systemInstruction: `You are an AI Agent, You have access of 3 available tools like to
+        to find sum of 2 number, get crypto price of any currency and find a number is prime or not
+        
+        Use these tools whenever required to confirm user query.
+        If user ask general question you can answer it directly if you don't need help of these three tools`,
+        tools: [
+          {
+            functionDeclarations: [
+              sumDeclaration,
+              primeDeclaration,
+              cryptoDeclaration,
+            ],
+          },
+        ],
+      },
+    });
+
+    if (response.functionCalls && response.functionCalls.length > 0) {
+      console.log(response.functionCalls[0]);
+      const { name, args } = response.functionCalls[0];
+
+      const funCall = availableTools[name];
+      const result = await funCall(args);
+
+      const functionResponsePart = {
+        name: name,
+        response: {
+          result: result,
+        },
+      };
+
+      // model
+      History.push({
+        role: "model",
+        parts: [
+          {
+            functionCall: response.functionCalls[0],
+          },
+        ],
+      });
+
+      // result Ko history daalna
+
+      History.push({
+        role: "user",
+        parts: [
+          {
+            functionResponse: functionResponsePart,
+          },
+        ],
+      });
+    } else {
+      History.push({
+        role: "model",
+        parts: [{ text: response.text }],
+      });
+      console.log(response.text);
+      break;
     }
-  });
-
-
-
-
-
-
-  
-  console.log(response);
-
-  History.push({
-    role: "model",
-    parts: [{ text: response.text }],
-  });
+  }
 }
 
 async function main() {
-  const userProblems = readline.question("Ask me anything..");
-  await runAgent(userProblems);
+  const userProblem = readlineSync.question("Ask me anything--> ");
+  await runAgent(userProblem);
   main();
 }
 
